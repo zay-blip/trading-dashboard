@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Desk</title>
+<style>
+body { font-family: system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; margin: 0; padding: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.equity { font-size: 2.5em; font-weight: bold; }
+.up { color: #00ff9d; }
+.down { color: #ff4d4d; }
+.section { background: #111; border: 1px solid #222; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+h2 { margin-top: 0; font-size: 1.2em; color: #888; }
+table { width: 100%; border-collapse: collapse; }
+td, th { padding: 8px; text-align: left; border-bottom: 1px solid #222; }
+.notes { width: 100%; min-height: 80px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #333; padding: 10px; }
+.small { font-size: 0.85em; color: #666; }
+</style>
+</head>
+<body>
+<div class="header">
+<div>
+<div class="equity" id="equity">$0.00</div>
+<div id="daily" class="small">Daily: $0.00</div>
+</div>
+<div id="status" class="small">LIVE</div>
+</div>
+
+<div class="section">
+<h2>Open Positions</h2>
+<table id="positions"><thead><tr><th>Asset</th><th>Side</th><th>Size</th><th>Entry</th><th>Current</th><th>P&L</th><th>Stop</th></tr></thead><tbody></tbody></table>
+</div>
+
+<div class="section">
+<h2>Recent Trades</h2>
+<table id="trades"><thead><tr><th>Time</th><th>Asset</th><th>Action</th><th>Size</th><th>P&L</th><th>Lesson</th></tr></thead><tbody></tbody></table>
+</div>
+
+<div class="section">
+<h2>Notes</h2>
+<textarea id="notes" class="notes" placeholder="Human notes. Observation Bot reads this."></textarea>
+</div>
+
+<div class="small" id="updated">Last update: --</div>
+
+<script>
+async function load() {
+  try {
+    const res = await fetch('state.json?' + Date.now());
+    const data = await res.json();
+    document.getElementById('equity').textContent = '$' + (data.equity || 0).toFixed(2);
+    document.getElementById('equity').className = 'equity ' + ((data.daily_pnl || 0) >= 0 ? 'up' : 'down');
+    document.getElementById('daily').textContent = 'Daily: $' + (data.daily_pnl || 0).toFixed(2);
+    document.getElementById('status').textContent = data.status || 'LIVE';
+    document.getElementById('updated').textContent = 'Last update: ' + (data.updated || '--');
+
+    const posBody = document.querySelector('#positions tbody');
+    posBody.innerHTML = '';
+    (data.positions || []).forEach(p => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${p.asset}</td><td>${p.side}</td><td>$${p.size}</td><td>${p.entry}</td><td>${p.current}</td><td class="${p.pnl>=0?'up':'down'}">$${p.pnl}</td><td>${p.stop}</td>`;
+      posBody.appendChild(tr);
+    });
+
+    const tradeBody = document.querySelector('#trades tbody');
+    tradeBody.innerHTML = '';
+    (data.trades || []).slice(0, 20).forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${t.time}</td><td>${t.asset}</td><td>${t.action}</td><td>$${t.size}</td><td class="${t.pnl>=0?'up':'down'}">$${t.pnl}</td><td>${t.lesson||''}</td>`;
+      tradeBody.appendChild(tr);
+    });
+
+    if (data.notes) document.getElementById('notes').value = data.notes;
+  } catch (e) {
+    console.error(e);
+  }
+}
+load();
+setInterval(load, 5000);
+
+document.getElementById('notes').addEventListener('change', async (e) => {
+  // Notes write-back is handled by Observation Bot polling or separate endpoint later
+  console.log('Notes changed locally');
+});
+</script>
+</body>
+</html>
